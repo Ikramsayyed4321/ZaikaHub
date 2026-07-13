@@ -1,0 +1,49 @@
+# Render deployment manifest for Zaika Hub.
+# This defines a single Web Service that builds both
+# the Express API and the Vite SPA, then serves the
+# SPA from Express (SERVE_STATIC_FRONTEND=true).
+#
+# Deploy: connect this repo in the Render dashboard and
+# select "Render Blueprint" — Render reads this file.
+# Set the secret values (marked sync: false) in the
+# Render dashboard before the first deploy.
+
+services:
+  - type: web
+    name: zaika-hub
+    runtime: node
+    region: oregon
+    plan: free
+    branch: main
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        # Render injects PORT automatically; no value needed.
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: DB_SSL
+        value: "true"
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: CLIENT_ORIGIN
+        # Set this to your Render service URL, e.g.
+        # https://zaika-hub.onrender.com
+        sync: false
+      - key: SERVE_STATIC_FRONTEND
+        value: "true"
+      - key: TRUST_PROXY
+        value: "true"
+      - key: API_PORT
+        value: "3001"
+
+# If you prefer a SPLIT deployment (API on Render,
+# frontend on Netlify), set SERVE_STATIC_FRONTEND=false
+# here and deploy the frontend separately with
+# VITE_API_URL=https://zaika-hub.onrender.com/api.

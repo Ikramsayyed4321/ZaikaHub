@@ -1,6 +1,14 @@
 import dotenv from 'dotenv';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load root .env (if present), then backend/.env (backend-specific overrides).
+// Platform-provided environment variables always take precedence over both.
 dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 function requiredInProduction(name: string, value: string | undefined, blockedValues: string[] = []) {
   if (process.env.NODE_ENV !== 'production') return;
@@ -43,6 +51,10 @@ export const config = {
     password: process.env.DB_PASSWORD || '',
     name: process.env.DB_NAME || 'restaurant_db',
     ssl: parseBoolean(process.env.DB_SSL, process.env.NODE_ENV === 'production' || Boolean(process.env.DATABASE_URL)),
+    // Whether to verify the server certificate chain. TiDB Cloud and most
+    // managed MySQL use publicly trusted CAs, so true is safe by default.
+    // Set DB_SSL_VERIFY=false only if your provider uses a private/unbundled CA.
+    sslVerify: parseBoolean(process.env.DB_SSL_VERIFY, true),
   },
   auth: {
     jwtSecret: process.env.JWT_SECRET || 'change-this-jwt-secret',

@@ -1,0 +1,16 @@
+# Netlify deployment for the Zaika Hub FRONTEND only.
+# Use this when the Express API runs separately on Render
+# (split architecture). For a single Render Web Service,
+# do NOT use this file.
+[build]
+  command = "npm run build:frontend"
+  publish = "dist"
+
+# React Router SPA fallback (also provided by public/_redirects).
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Set this in the Netlify UI (or netlify.toml env):
+#   VITE_API_URL = https://your-render-api.onrender.com/api

@@ -16,7 +16,7 @@ function databaseConfig(includeDatabase: boolean): PoolOptions {
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
-    ssl: config.database.ssl ? { rejectUnauthorized: true } : undefined,
+    ssl: config.database.ssl ? { rejectUnauthorized: config.database.sslVerify } : undefined,
   };
 }
 

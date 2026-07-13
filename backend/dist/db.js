@@ -14,7 +14,7 @@ function databaseConfig(includeDatabase) {
         waitForConnections: true,
         connectionLimit: 10,
         queueLimit: 0,
-        ssl: config.database.ssl ? { rejectUnauthorized: true } : undefined,
+        ssl: config.database.ssl ? { rejectUnauthorized: config.database.sslVerify } : undefined,
     };
 }
 const baseConfig = databaseConfig(false);
