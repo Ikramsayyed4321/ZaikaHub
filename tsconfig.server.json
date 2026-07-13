@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "rootDir": "backend/src",
+    "outDir": "backend/dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "types": ["node"]
+  },
+  "include": ["backend/src/**/*.ts"],
+  "exclude": [
+    "backend/src/**/*.test.ts",
+    "backend/src/**/*.spec.ts",
+    "backend/src/**/__tests__/**",
+    "backend/src/**/__mocks__/**",
+    "backend/src/**/fixtures/**",
+    "backend/src/**/*.stories.ts"
+  ]
+}
