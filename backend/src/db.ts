@@ -1,31 +1,50 @@
-import mysql, { Pool, PoolConnection, RowDataPacket } from 'mysql2/promise';
+import mysql, { Pool, PoolConnection, PoolOptions, RowDataPacket } from 'mysql2/promise';
 import bcrypt from 'bcrypt';
 import { config, isDevelopment } from './config.js';
 
 let pool: Pool | undefined;
 
-const baseConfig = {
-  host: config.database.host,
-  port: config.database.port,
-  user: config.database.user,
-  password: config.database.password,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-};
+function databaseConfig(includeDatabase: boolean): PoolOptions {
+  const url = config.database.url ? new URL(config.database.url) : undefined;
+  const database = includeDatabase ? url?.pathname.replace(/^\//, '') || config.database.name : undefined;
+  return {
+    host: url?.hostname || config.database.host,
+    port: Number(url?.port || config.database.port),
+    user: url ? decodeURIComponent(url.username) : config.database.user,
+    password: url ? decodeURIComponent(url.password) : config.database.password,
+    database,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+    ssl: config.database.ssl ? { rejectUnauthorized: true } : undefined,
+  };
+}
+
+const baseConfig = databaseConfig(false);
+const poolConfig = databaseConfig(true);
+const databaseName = poolConfig.database || config.database.name;
+
+const databaseExistsCodes = new Set(['ER_DB_CREATE_EXISTS']);
+const createDatabaseDeniedCodes = new Set(['ER_DBACCESS_DENIED_ERROR', 'ER_ACCESS_DENIED_ERROR', 'ER_SPECIFIC_ACCESS_DENIED_ERROR']);
 
 export async function ensureDatabase() {
-  const connection = await mysql.createConnection(baseConfig);
-  await connection.query(
-    `CREATE DATABASE IF NOT EXISTS \`${config.database.name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
-  );
-  await connection.end();
+  let connection: Awaited<ReturnType<typeof mysql.createConnection>> | undefined;
+  try {
+    connection = await mysql.createConnection(baseConfig);
+    await connection.query(`CREATE DATABASE IF NOT EXISTS \`${databaseName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    if (!code || (!createDatabaseDeniedCodes.has(code) && !databaseExistsCodes.has(code))) throw error;
+    console.warn(`Skipping CREATE DATABASE for ${databaseName}: ${code}. The database must already exist.`);
+  } finally {
+    await connection?.end();
+  }
 }
 
 export async function getPool() {
   if (!pool) {
     await ensureDatabase();
-    pool = mysql.createPool({ ...baseConfig, database: config.database.name });
+    pool = mysql.createPool(poolConfig);
     await runMigrations(pool);
   }
   return pool;
@@ -34,7 +53,7 @@ export async function getPool() {
 async function hasColumn(db: PoolConnection | Pool, table: string, column: string) {
   const [rows] = await db.query<RowDataPacket[]>(
     `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-    [config.database.name, table, column],
+    [databaseName, table, column],
   );
   return rows.length > 0;
 }

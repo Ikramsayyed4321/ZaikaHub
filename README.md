@@ -35,7 +35,7 @@ SEED_ADMIN_PASSWORD=admin123
 
 ```bash
 npm install
-npm start
+npm run dev
 ```
 
 Frontend: `http://localhost:5174`
@@ -133,9 +133,16 @@ npm test
 
 ```bash
 npm run build
-npm run migrate
-pm2 start ecosystem.config.cjs --env production
+npm start
 ```
+
+Compiled backend output is generated in `backend/dist`. The production start command runs `node backend/dist/index.js`.
+
+For Render and Netlify deployment, see:
+
+- `docs/render-deployment.md`
+- `docs/netlify-deployment.md`
+- `docs/production-env.md`
 
 ## Ubuntu 24.04 VPS Deployment
 

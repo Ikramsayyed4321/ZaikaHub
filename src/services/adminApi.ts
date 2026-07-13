@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 export async function adminRequest<T>(path: string, options?: RequestInit): Promise<T> {
   const token = localStorage.getItem('zaikaHubAccessToken');

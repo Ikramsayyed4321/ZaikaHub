@@ -2,30 +2,52 @@ import mysql from 'mysql2/promise';
 import bcrypt from 'bcrypt';
 import { config, isDevelopment } from './config.js';
 let pool;
-const baseConfig = {
-    host: config.database.host,
-    port: config.database.port,
-    user: config.database.user,
-    password: config.database.password,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
-};
+function databaseConfig(includeDatabase) {
+    const url = config.database.url ? new URL(config.database.url) : undefined;
+    const database = includeDatabase ? url?.pathname.replace(/^\//, '') || config.database.name : undefined;
+    return {
+        host: url?.hostname || config.database.host,
+        port: Number(url?.port || config.database.port),
+        user: url ? decodeURIComponent(url.username) : config.database.user,
+        password: url ? decodeURIComponent(url.password) : config.database.password,
+        database,
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0,
+        ssl: config.database.ssl ? { rejectUnauthorized: true } : undefined,
+    };
+}
+const baseConfig = databaseConfig(false);
+const poolConfig = databaseConfig(true);
+const databaseName = poolConfig.database || config.database.name;
+const databaseExistsCodes = new Set(['ER_DB_CREATE_EXISTS']);
+const createDatabaseDeniedCodes = new Set(['ER_DBACCESS_DENIED_ERROR', 'ER_ACCESS_DENIED_ERROR', 'ER_SPECIFIC_ACCESS_DENIED_ERROR']);
 export async function ensureDatabase() {
-    const connection = await mysql.createConnection(baseConfig);
-    await connection.query(`CREATE DATABASE IF NOT EXISTS \`${config.database.name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
-    await connection.end();
+    let connection;
+    try {
+        connection = await mysql.createConnection(baseConfig);
+        await connection.query(`CREATE DATABASE IF NOT EXISTS \`${databaseName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+    }
+    catch (error) {
+        const code = error.code;
+        if (!code || (!createDatabaseDeniedCodes.has(code) && !databaseExistsCodes.has(code)))
+            throw error;
+        console.warn(`Skipping CREATE DATABASE for ${databaseName}: ${code}. The database must already exist.`);
+    }
+    finally {
+        await connection?.end();
+    }
 }
 export async function getPool() {
     if (!pool) {
         await ensureDatabase();
-        pool = mysql.createPool({ ...baseConfig, database: config.database.name });
+        pool = mysql.createPool(poolConfig);
         await runMigrations(pool);
     }
     return pool;
 }
 async function hasColumn(db, table, column) {
-    const [rows] = await db.query(`SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`, [config.database.name, table, column]);
+    const [rows] = await db.query(`SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`, [databaseName, table, column]);
     return rows.length > 0;
 }
 async function addColumnIfMissing(db, table, column, definition) {
@@ -152,6 +174,7 @@ async function runMigrations(db) {
     await addColumnIfMissing(db, 'orders', 'restaurant_id', 'restaurant_id INT NULL');
     await addColumnIfMissing(db, 'orders', 'waiter_id', 'waiter_id INT NULL');
     await addColumnIfMissing(db, 'orders', 'updated_at', 'updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP');
+    await db.query("ALTER TABLE orders MODIFY status ENUM('pending','preparing','ready','completed') DEFAULT 'pending'");
     await db.query('UPDATE orders SET restaurant_id = 1 WHERE restaurant_id IS NULL');
     await db.query(`
     CREATE TABLE IF NOT EXISTS order_items (
@@ -189,6 +212,24 @@ async function runMigrations(db) {
       status ENUM('success','failed','logout') NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    )
+  `);
+    await db.query(`
+    CREATE TABLE IF NOT EXISTS refresh_sessions (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      restaurant_id INT NULL,
+      token_hash CHAR(64) NOT NULL UNIQUE,
+      family_id CHAR(36) NOT NULL,
+      jti CHAR(36) NOT NULL UNIQUE,
+      user_agent VARCHAR(255),
+      ip_address VARCHAR(80),
+      expires_at TIMESTAMP NOT NULL,
+      revoked_at TIMESTAMP NULL,
+      replaced_by_jti CHAR(36) NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE
     )
   `);
     await db.query(`
@@ -250,6 +291,10 @@ async function runMigrations(db) {
     await addIndex(db, 'CREATE INDEX idx_orders_restaurant_status_date ON orders (restaurant_id, status, created_at)');
     await addIndex(db, 'CREATE INDEX idx_payments_restaurant_date ON payments (restaurant_id, payment_date)');
     await addIndex(db, 'CREATE INDEX idx_activity_restaurant_date ON activity_logs (restaurant_id, created_at)');
+    await addIndex(db, 'CREATE INDEX idx_order_items_order ON order_items (order_id)');
+    await addIndex(db, 'CREATE INDEX idx_tables_restaurant_number ON `tables` (restaurant_id, table_number)');
+    await addIndex(db, 'CREATE INDEX idx_refresh_sessions_user ON refresh_sessions (user_id, revoked_at, expires_at)');
+    await addIndex(db, 'CREATE INDEX idx_refresh_sessions_family ON refresh_sessions (family_id, revoked_at)');
     await seedData(db);
     await db.query('INSERT IGNORE INTO migrations (name) VALUES (?)', ['001_core_saas_auth_reports']);
 }

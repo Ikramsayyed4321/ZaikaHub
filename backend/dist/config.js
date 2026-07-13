@@ -1,22 +1,41 @@
 import dotenv from 'dotenv';
 dotenv.config();
+function requiredInProduction(name, value, blockedValues = []) {
+    if (process.env.NODE_ENV !== 'production')
+        return;
+    if (!value || blockedValues.includes(value)) {
+        throw new Error(`Missing or insecure production environment variable: ${name}`);
+    }
+}
+function parseBoolean(value, fallback) {
+    if (value === undefined)
+        return fallback;
+    return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
+}
 const configuredClientOrigins = (process.env.CLIENT_ORIGIN || '')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
 const localClientOrigins = ['http://localhost:5174', 'http://127.0.0.1:5174'];
-const clientOrigins = Array.from(new Set([...configuredClientOrigins, ...localClientOrigins]));
+const clientOrigins = Array.from(new Set([...(process.env.NODE_ENV === 'production' ? configuredClientOrigins : [...configuredClientOrigins, ...localClientOrigins])]));
+requiredInProduction('JWT_SECRET', process.env.JWT_SECRET, ['change-this-jwt-secret', 'change-this-access-secret']);
+requiredInProduction('JWT_REFRESH_SECRET', process.env.JWT_REFRESH_SECRET, ['change-this-refresh-secret']);
+requiredInProduction('DATABASE_URL or DB_HOST/DB_USER/DB_PASSWORD/DB_NAME', process.env.DATABASE_URL || process.env.DB_HOST);
 export const config = {
     nodeEnv: process.env.NODE_ENV || 'development',
-    apiPort: Number(process.env.API_PORT || 3001),
-    clientOrigin: process.env.CLIENT_ORIGIN || 'http://localhost:5174',
+    apiPort: Number(process.env.PORT || process.env.API_PORT || 3001),
+    clientOrigin: process.env.CLIENT_ORIGIN || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5174'),
     clientOrigins,
+    trustProxy: parseBoolean(process.env.TRUST_PROXY, process.env.NODE_ENV === 'production'),
+    serveStaticFrontend: parseBoolean(process.env.SERVE_STATIC_FRONTEND, process.env.NODE_ENV === 'production'),
     database: {
+        url: process.env.DATABASE_URL,
         host: process.env.DB_HOST || 'localhost',
         port: Number(process.env.DB_PORT || 3306),
         user: process.env.DB_USER || 'root',
         password: process.env.DB_PASSWORD || '',
         name: process.env.DB_NAME || 'restaurant_db',
+        ssl: parseBoolean(process.env.DB_SSL, process.env.NODE_ENV === 'production' || Boolean(process.env.DATABASE_URL)),
     },
     auth: {
         jwtSecret: process.env.JWT_SECRET || 'change-this-jwt-secret',

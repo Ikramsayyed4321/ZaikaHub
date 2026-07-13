@@ -5,7 +5,7 @@ export function ReportsPage() {
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [from, setFrom] = useState(new Date().toISOString().slice(0, 10));
   const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
-  const base = `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/reports/sales?from=${from}&to=${to}`;
+  const base = `${import.meta.env.VITE_API_URL || '/api'}/reports/sales?from=${from}&to=${to}`;
 
   useEffect(() => {
     adminRequest<Record<string, unknown>[]>(`/reports/sales?from=${from}&to=${to}`).then(setRows);

@@ -1,15 +1,15 @@
 import { Router } from 'express';
 import { getPool } from '../db.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { requireAuth } from '../middleware/auth.js';
-import { readState, replaceState } from '../stateRepository.js';
+import { readState } from '../stateRepository.js';
 export const stateRouter = Router();
 stateRouter.get('/', asyncHandler(async (request, response) => {
     const db = await getPool();
     response.json(await readState(db, request.user?.restaurantId || 1));
 }));
-stateRouter.put('/', requireAuth, asyncHandler(async (request, response) => {
-    const db = await getPool();
-    await replaceState(db, request.body, request.user?.restaurantId || 1);
-    response.json({ ok: true });
+stateRouter.put('/', asyncHandler(async (request, response) => {
+    response.status(410).json({
+        code: 'STATE_REPLACE_DISABLED',
+        message: 'Full-state database replacement is disabled. Use domain APIs for orders, menu, and payments.',
+    });
 }));

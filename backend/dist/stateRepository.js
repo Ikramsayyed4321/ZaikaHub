@@ -1,5 +1,11 @@
 function dbStatusToUiStatus(status) {
-    return status === 'completed' ? 'Ready' : 'New';
+    if (status === 'completed')
+        return 'Completed';
+    if (status === 'ready')
+        return 'Ready';
+    if (status === 'preparing')
+        return 'Preparing';
+    return 'New';
 }
 function uiStatusToDbStatus(status) {
     return status === 'Completed' ? 'completed' : 'pending';
@@ -26,7 +32,10 @@ export async function readState(db, restaurantId = 1) {
     const [orderRows] = await db.query(`SELECT o.id, o.table_id, t.table_number, o.total_amount, o.status, o.created_at
      FROM orders o LEFT JOIN \`tables\` t ON t.id = o.table_id WHERE o.restaurant_id = ? ORDER BY o.created_at DESC, o.id DESC`, [restaurantId]);
     const [itemRows] = await db.query(`SELECT oi.order_id, oi.menu_item_id, oi.quantity, oi.price, mi.name, mi.category, mi.available
-     FROM order_items oi LEFT JOIN menu_items mi ON mi.id = oi.menu_item_id`);
+     FROM order_items oi
+     JOIN orders o ON o.id = oi.order_id
+     LEFT JOIN menu_items mi ON mi.id = oi.menu_item_id
+     WHERE o.restaurant_id = ?`, [restaurantId]);
     const [paymentRows] = await db.query('SELECT order_id, amount, payment_date FROM payments WHERE restaurant_id = ?', [restaurantId]);
     const paymentsByOrder = new Map(paymentRows.map((row) => [Number(row.order_id), row]));
     const itemsByOrder = itemRows.reduce((map, row) => {

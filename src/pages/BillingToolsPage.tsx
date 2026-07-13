@@ -4,7 +4,7 @@ import { adminRequest } from '../services/adminApi';
 export function BillingToolsPage() {
   const [orderId, setOrderId] = useState('');
   const [message, setMessage] = useState('');
-  const api = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+  const api = import.meta.env.VITE_API_URL || '/api';
 
   const generate = async () => {
     const invoice = await adminRequest<{ invoiceNumber: string }>(`/invoices/orders/${orderId}`, {

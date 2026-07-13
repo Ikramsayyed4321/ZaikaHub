@@ -4,8 +4,8 @@ import { app } from './app.js';
 
 async function start() {
   await getPool();
-  app.listen(config.apiPort, () => {
-    console.log(`Zaika Hub API running on http://localhost:${config.apiPort}`);
+  app.listen(config.apiPort, '0.0.0.0', () => {
+    console.log(`Zaika Hub API listening on port ${config.apiPort}`);
   });
 }
 

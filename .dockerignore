@@ -1,0 +1,14 @@
+.git
+.codex
+.agents
+node_modules
+backend/dist
+dist
+coverage
+*.log
+.env
+.env.*
+!.env.example
+npm-debug.log*
+Dockerfile
+.dockerignore
